@@ -1,0 +1,190 @@
+---
+title: 'Reproducible Research: Project 01'
+author: "Thiago Veras"
+date: "July 13, 2015"
+output: html_document
+---
+
+### Dataset: Activity monitoring data
+#### The variables included in this dataset are:
+- steps: Number of steps taking in a 5-minute interval (missing values are coded as NA)   
+- date: The date on which the measurement was taken in YYYY-MM-DD format   
+- interval: Identifier for the 5-minute interval in which measurement was taken   
+
+#### The dataset is stored in a comma-separated-value (CSV) file and there are a total of 17,568 observations in this dataset.
+
+### Loading and preprocessing the data
+#### Loading data
+```{r loading_data}
+# Loading the data
+raw_data <- read.csv("activity.csv")
+
+# Printing the head of the raw data
+head(raw_data)
+```
+
+#### Preprocessing the data
+```{r preprocessing_data}
+# Transforming the date attribute to an actual date format
+raw_data$date <- as.POSIXct(raw_data$date, format="%Y-%m-%d")
+
+# Computing the weekdays from the date attribute
+raw_data <- data.frame(date=raw_data$date, 
+                           weekday=tolower(weekdays(raw_data$date)), 
+                           steps=raw_data$steps, 
+                           interval=raw_data$interval)
+
+# Create the activity data.frame
+activity_data <- data.frame(date=raw_data$date, 
+                            weekday=raw_data$weekday, 
+                            interval=raw_data$interval,
+                            steps=raw_data$steps)
+
+# Printing the head of activity data.frame
+head(activity_data)
+```
+
+### What is mean total number of steps taken per day?
+```{r}
+# Importing the ggplot2 library
+library(ggplot2)
+
+# Aggregating steps by date
+aggregated_activity_na_rm <- aggregate(activity_data$steps, 
+                                        by=list(activity_data$date), 
+                                        FUN=sum, na.rm=TRUE)
+
+# Rename the attributes
+names(aggregated_activity_na_rm) <- c("date", "total_steps")
+
+# Ploting the graph
+ggplot(aggregated_activity_na_rm, aes(x=total_steps)) + 
+    geom_histogram(binwidth=1000, breaks=seq(from=0, to=25000, by=2500), colour="black", fill="darkred") +
+    ylim(0,20) +
+    ggtitle("Histogram of the total of steps taken each day\n(NA removed)") +
+    xlab("Total of Steps") +
+    ylab("Frequency")
+    
+# Calculating the mean
+mean(aggregated_activity_na_rm$total_steps, na.rm=TRUE)
+
+# Calculating the median
+median(aggregated_activity_na_rm$total_steps, na.rm=TRUE)
+```
+
+### What is the average daily activity pattern?
+```{r}
+# Importing the ggplot2 library
+library(ggplot2)
+
+# Aggregating average of steps by interval
+average_activity_by_interval <- aggregate(x=list(steps=activity_data$steps), 
+                                   by=list(interval=activity_data$interval),
+                                   FUN=mean, na.rm=TRUE)
+
+ggplot(data=average_activity_by_interval, aes(x=interval, y=steps)) +
+    geom_line(binwidth=100, breaks=seq(from=0, to=3000, by=500), colour="darkred") +
+    ylim(0,250) +
+    xlab("5-minute interval") +
+    ylab("Average of steps")
+```
+
+### Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+```{r}
+average_activity_by_interval[which.max(average_activity_by_interval$steps),]
+```
+
+### Imputing missing values
+#### Note that there are a number of days/intervals where there are missing values (coded as NA). The presence of missing days may introduce bias into some calculations or summaries of the data.
+
+```{r}
+total_na <- sum(is.na(activity_data$steps))
+total_na
+```
+
+All of the missing values are filled in with mean value for that 5-minute interval.
+```{r}
+# Finding the NA positions
+na_positions <- which(is.na(activity_data$steps))
+
+# Creating a vector of means
+mean_vector <- rep(mean(activity_data$steps, na.rm=TRUE), times=length(na_positions))
+
+# Replacing the NAs by the means
+activity_data[na_positions, "steps"] <- mean_vector
+
+# Printing 
+head(activity_data)
+```
+
+Now, using the filled data set, let's make a histogram of the total number of steps taken each day and calculate the mean and median total number of steps.
+
+```{r}
+# Importing the ggplot2 library
+library(ggplot2)
+
+# Aggregating steps by date
+aggregated_activity_by_day <- aggregate(activity_data$steps, 
+                                        by=list(activity_data$date), 
+                                        FUN=sum, na.rm=TRUE)
+
+# Rename the attributes
+names(aggregated_activity_by_day) <- c("date", "total_steps")
+
+# Ploting the graph
+ggplot(aggregated_activity_by_day, aes(x=total_steps)) + 
+    geom_histogram(binwidth=1000, breaks=seq(from=0, to=25000, by=2500), colour="black", fill="darkred") +
+    ylim(0,30) +
+    ggtitle("Histogram of the total of steps taken each day\n(NA replaced by mean value)") +
+    xlab("Total of Steps") +
+    ylab("Frequency")
+    
+# Calculating the mean
+mean(aggregated_activity_by_day$total_steps, na.rm=TRUE)
+
+# Calculating the median
+median(aggregated_activity_by_day$total_steps, na.rm=TRUE)
+```
+
+Mean and median values are higher after imputing missing data. The reason is
+that in the original data, there are some days with `steps` values `NA` for 
+any `interval`. The total number of steps taken in such days are set to 0s by
+default. However, after replacing missing `steps` values with the mean `steps`
+of associated `interval` value, these 0 values are removed from the histogram
+of total number of steps taken each day.
+
+### Are there differences in activity patterns between weekdays and weekends?
+```{r}
+head(activity_data)
+
+# Computing the day type (weekend or weekday)
+activity_data <- cbind(activity_data, 
+                  daytype=ifelse(activity_data$weekday == "saturday" | 
+                                 activity_data$weekday == "sunday", 
+                                 "weekend", "weekday"))
+
+head(activity_data)
+
+```
+
+Now, let's make a panel plot containing plots of average number of steps taken
+on weekdays and weekends.
+```{r}
+averages_weekday <- aggregate(steps ~ interval + weekday, data=activity_data, mean)
+                    ggplot(averages_weekday, aes(interval, steps)) + 
+                    geom_line(binwidth=100, breaks=seq(from=0, to=3000, by=500), colour="darkred") +
+                    ylim(0,400) + 
+                    facet_grid(weekday ~ .) +
+                    xlab("5-minute interval") + 
+                    ylab("Total of steps")
+
+
+averages_daytype <- aggregate(steps ~ interval + daytype, data=activity_data, mean)
+                    ggplot(averages_daytype, aes(interval, steps)) + 
+                    geom_line(binwidth=100, breaks=seq(from=0, to=3000, by=500), colour="darkred") +
+                    ylim(0,250) + 
+                    facet_grid(daytype ~ .) +
+                    xlab("5-minute interval") + 
+                    ylab("Total of steps")
+                    
+```
