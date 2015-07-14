@@ -17,7 +17,7 @@ output: html_document
 #### 1. Loading data
 ```{r loading_data}
 # Loading the data
-raw_data <- read.csv("activity.csv")
+raw_data <- read.csv("activity.csv", colClasses = c("numeric", "Date", "numeric"))
 
 # Printing the head of the raw data
 head(raw_data)
@@ -25,18 +25,9 @@ head(raw_data)
 
 #### 2. Preprocessing the data
 ```{r preprocessing_data}
-# Transforming the date attribute to an actual date format
-raw_data$date <- as.POSIXct(raw_data$date, format="%Y-%m-%d")
-
-# Computing the weekdays from the date attribute
-raw_data <- data.frame(date=raw_data$date, 
-                           weekday=tolower(weekdays(raw_data$date)), 
-                           steps=raw_data$steps, 
-                           interval=raw_data$interval)
-
 # Create the activity data.frame
 activity_data <- data.frame(date=raw_data$date, 
-                            weekday=raw_data$weekday, 
+                            weekday=tolower(weekdays(raw_data$date)), 
                             interval=raw_data$interval,
                             steps=raw_data$steps)
 
@@ -48,11 +39,10 @@ head(activity_data)
 #### 1. Calculating the total number of steps taken per day
 ```{r}
 # Aggregating steps by date
-aggregated_activity_na_rm <- aggregate(activity_data$steps, 
-                                        by=list(activity_data$date), 
-                                        FUN=sum, na.rm=TRUE)
-# Rename the attributes
-names(aggregated_activity_na_rm) <- c("date", "total_steps")
+aggregated_activity_na_rm <- aggregate(steps ~ date, activity_data, sum, na.rm = TRUE)
+
+# Renaming the second attribute
+names(aggregated_activity_na_rm)[2] <- "total_steps"
 ```
 
 #### 2. Making a histogram of the total number of steps taken each day
@@ -85,9 +75,7 @@ median(aggregated_activity_na_rm$total_steps, na.rm=TRUE)
 library(ggplot2)
 
 # Aggregating average of steps by interval
-average_activity_by_interval <- aggregate(x=list(steps=activity_data$steps), 
-                                   by=list(interval=activity_data$interval),
-                                   FUN=mean, na.rm=TRUE)
+average_activity_by_interval <- aggregate(steps ~ interval, activity_data, mean, na.rm = TRUE)
 
 ggplot(data=average_activity_by_interval, aes(x=interval, y=steps)) +
     geom_line(binwidth=100, breaks=seq(from=0, to=3000, by=500), colour="darkred") +
@@ -134,12 +122,10 @@ head(activity_data)
 library(ggplot2)
 
 # Aggregating steps by date
-aggregated_activity_by_day <- aggregate(activity_data$steps, 
-                                        by=list(activity_data$date), 
-                                        FUN=sum, na.rm=TRUE)
+aggregated_activity_by_day <- aggregate(steps ~ date, activity_data, sum, na.rm = TRUE)
 
-# Rename the attributes
-names(aggregated_activity_by_day) <- c("date", "total_steps")
+# Renaming the second attribute
+names(aggregated_activity_by_day)[2] <- "total_steps"
 
 # Ploting the graph
 ggplot(aggregated_activity_by_day, aes(x=total_steps)) + 
@@ -159,12 +145,11 @@ mean(aggregated_activity_by_day$total_steps, na.rm=TRUE)
 median(aggregated_activity_by_day$total_steps, na.rm=TRUE)
 ```
 
-#### Do these values differ from the estimates from the first part of the assignment? What is the impact of imputing missing data on the estimates of the total daily number of steps?
+#### Do these values differ from the estimates from the first part of the assignment? 
+They do differ but ever so slightly.
 
-The mean and median values are higher after filled in missing data. 
-The reason is that in the original data, there are some days with `steps` values `NA` for any `interval`. 
-The total number of steps taken in such days are set to 0s by default. 
-However, after replacing missing `steps` values with the mean `steps` of associated `interval` value, these 0 values are removed from the histogram of total number of steps taken each day.
+#### What is the impact of imputing missing data on the estimates of the total daily number of steps?
+The impact depends on how you impute the missing data. When we used the average for a given interval, there was practically no difference because we basically pulled the averages closer to the inserted average value.
 
 ### Are there differences in activity patterns between weekdays and weekends?
 #### 1. Creating a new factor variable in the dataset with two levels – “weekday” and “weekend” indicating whether a given date is a weekday or weekend day.
